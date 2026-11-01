@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.17.3",
+    "mongoose": "^6.2.3",
+    "stripe": "^8.204.0",
+    "kafka": "^0.2.3",
+    "kafkajs": "^2.2.4"
+  }
+}

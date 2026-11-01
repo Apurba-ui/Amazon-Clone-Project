@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper
+    container_name: zookeeper
+    restart: always
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+    networks:
+      - app-network
+
+  kafka:
+    image: confluentinc/cp-kafka
+    container_name: kafka
+    restart: always
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_BROKER_ID: 1
+    ports:
+      - "9092:9092"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9092"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+
+  mongo:
+    image: mongo
+    container_name: mongodb
+    restart: always
+    depends_on:
+      - kafka
+    ports:
+      - "27017:27017"
+    networks:
+      - app-network
+
+  users-service:
+    build:
+      context: ./UsersService  
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+      - kafka
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/ecommerce_web_app
+    ports:
+      - "8001:8001"
+    networks:
+      - app-network
+
+  orders-service:
+    build:
+      context: ./OrdersService  
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+      - kafka
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/ecommerce_web_app
+      - KAFKA_BROKER=kafka:9092
+    ports:
+      - "8003:8003"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "kafka", "9092"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+
+  inventory-service:
+    build:
+      context: ./InventoryService  
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+      - kafka
+      - orders-service
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/ecommerce_web_app
+      - KAFKA_BROKER=kafka:9092
+    ports:
+      - "8002:8002"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "orders-service", "8003"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+
+networks:
+  app-network:
+    driver: bridge
